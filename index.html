@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UK ULEZ Compliance Checker</title>
+  <style>
+    :root {
+      --primary: #1e88e5;
+      --success: #43a047;
+      --danger: #e53935;
+      --neutral: #757575;
+      --light: #f5f5f5;
+      --dark: #212121;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    body {
+      background-color: var(--light);
+      color: var(--dark);
+      line-height: 1.6;
+      padding: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: var(--primary);
+    }
+    
+    .container {
+      background-color: white;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    
+    input[type="text"] {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 16px;
+    }
+    
+    button {
+      background-color: var(--primary);
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      display: block;
+      width: 100%;
+      transition: background-color 0.3s;
+    }
+    
+    button:hover {
+      background-color: #1565c0;
+    }
+    
+    button:disabled {
+      background-color: var(--neutral);
+      cursor: not-allowed;
+    }
+    
+    .results {
+      margin-top: 30px;
+      display: none;
+    }
+    
+    .result-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 15px;
+    }
+    
+    .ulez-status {
+      font-size: 18px;
+      font-weight: bold;
+      padding: 10px 15px;
+      border-radius: 4px;
+      text-align: center;
+    }
+    
+    .exempt {
+      background-color: var(--success);
+      color: white;
+    }
+    
+    .not-exempt {
+      background-color: var(--danger);
+      color: white;
+    }
+    
+    .vehicle-details {
+      margin-bottom: 20px;
+      background-color: #f8f9fa;
+      padding: 15px;
+      border-radius: 4px;
+    }
+    
+    .vehicle-detail {
+      margin-bottom: 5px;
+    }
+    
+    .detail-label {
+      font-weight: bold;
+      margin-right: 5px;
+    }
+    
+    .json-toggle {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      margin-top: 20px;
+      user-select: none;
+    }
+    
+    .json-toggle-icon {
+      margin-right: 5px;
+      transition: transform 0.3s;
+    }
+    
+    .json-toggle.open .json-toggle-icon {
+      transform: rotate(90deg);
+    }
+    
+    .json-response {
+      background-color: #f8f9fa;
+      padding: 15px;
+      border-radius: 4px;
+      margin-top: 10px;
+      white-space: pre-wrap;
+      font-family: monospace;
+      display: none;
+      max-height: 300px;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+    }
+    
+    .error-message {
+      color: var(--danger);
+      margin-top: 15px;
+      text-align: center;
+      font-weight: bold;
+      display: none;
+    }
+    
+    .loading {
+      display: none;
+      text-align: center;
+      margin-top: 20px;
+    }
+    
+    .spinner {
+      border: 4px solid rgba(0, 0, 0, 0.1);
+      border-radius: 50%;
+      border-top: 4px solid var(--primary);
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 10px auto;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <h1>UK ULEZ Compliance Checker</h1>
+  
+  <div class="container">
+    <div class="form-group">
+      <label for="vrm">Vehicle Registration Number (Number Plate):</label>
+      <input type="text" id="vrm" placeholder="e.g. AB12 CDE">
+    </div>
+    
+    <button id="check-button">Check ULEZ Compliance</button>
+    
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <p>Checking registration...</p>
+    </div>
+    
+    <div class="error-message" id="error-message"></div>
+    
+    <div class="results" id="results">
+      <div class="result-header">
+        <h2>Results</h2>
+        <div class="ulez-status" id="ulez-status"></div>
+      </div>
+      
+      <div class="vehicle-details" id="vehicle-details"></div>
+      
+      <div class="json-toggle" id="json-toggle">
+        <span class="json-toggle-icon">►</span>
+        <span>Show JSON Response</span>
+      </div>
+      
+      <div class="json-response" id="json-response"></div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const vrmInput = document.getElementById('vrm');
+      const checkButton = document.getElementById('check-button');
+      const loading = document.getElementById('loading');
+      const results = document.getElementById('results');
+      const ulezStatus = document.getElementById('ulez-status');
+      const vehicleDetails = document.getElementById('vehicle-details');
+      const jsonToggle = document.getElementById('json-toggle');
+      const jsonResponse = document.getElementById('json-response');
+      const errorMessage = document.getElementById('error-message');
+      
+      // Add event listener to the check button
+      checkButton.addEventListener('click', checkCompliance);
+      
+      // Toggle JSON response visibility
+      jsonToggle.addEventListener('click', function() {
+        jsonToggle.classList.toggle('open');
+        jsonResponse.style.display = jsonResponse.style.display === 'none' ? 'block' : 'none';
+      });
+      
+      // Function to check ULEZ compliance
+      async function checkCompliance() {
+        // Reset UI
+        results.style.display = 'none';
+        errorMessage.style.display = 'none';
+        jsonResponse.style.display = 'none';
+        jsonToggle.classList.remove('open');
+        
+        // Get VRM and remove spaces
+        const vrm = vrmInput.value.trim().replace(/\s+/g, '');
+        
+        // Validate input
+        if (!vrm) {
+          errorMessage.textContent = 'Please enter a vehicle registration number.';
+          errorMessage.style.display = 'block';
+          return;
+        }
+        
+        // Show loading
+        checkButton.disabled = true;
+        loading.style.display = 'block';
+        
+        try {
+          // Prepare request data
+          const requestData = {
+            vrmLookupRequest: {
+              vRM: vrm,
+              country: "UK",
+              date: {}
+            }
+          };
+          
+          // Make API request
+          const response = await fetch('https://mobileapim.tfl.gov.uk/Prod/unirucCapitaFacade/VRMLookup', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestData)
+          });
+          
+          // Check if response is OK
+          if (!response.ok) {
+            throw new Error(`Error: ${response.status} - ${response.statusText}`);
+          }
+          
+          // Parse response
+          const data = await response.json();
+          
+          // Display JSON response
+          jsonResponse.textContent = JSON.stringify(data, null, 2);
+          
+          // Process data
+          processResponse(data);
+          
+        } catch (error) {
+          console.error('Error:', error);
+          errorMessage.textContent = `An error occurred: ${error.message}. Please try again.`;
+          errorMessage.style.display = 'block';
+        } finally {
+          // Hide loading
+          loading.style.display = 'none';
+          checkButton.disabled = false;
+        }
+      }
+      
+      // Function to process and display the API response
+      function processResponse(data) {
+        // Check if we have valid response data
+        if (!data.vrmLookupResponse || !data.vrmLookupResponse.vehicleDetails) {
+          errorMessage.textContent = 'No vehicle details found for this registration number.';
+          errorMessage.style.display = 'block';
+          return;
+        }
+        
+        const vehicleData = data.vrmLookupResponse.vehicleDetails;
+        
+        // Extract ULEZ status
+        const isULEZExempt = vehicleData.isULEZExempt;
+        const isExempt = isULEZExempt === 1;
+        
+        // Update ULEZ status display
+        ulezStatus.textContent = isExempt ? 'ULEZ EXEMPT' : 'NOT EXEMPT';
+        ulezStatus.className = 'ulez-status ' + (isExempt ? 'exempt' : 'not-exempt');
+        
+        // Update vehicle details
+        let detailsHTML = '';
+        
+        if (vehicleData.vRM) {
+          detailsHTML += `<div class="vehicle-detail"><span class="detail-label">Registration:</span> ${vehicleData.vRM}</div>`;
+        }
+        
+        if (vehicleData.make) {
+          detailsHTML += `<div class="vehicle-detail"><span class="detail-label">Make:</span> ${vehicleData.make}</div>`;
+        }
+        
+        if (vehicleData.model) {
+          detailsHTML += `<div class="vehicle-detail"><span class="detail-label">Model:</span> ${vehicleData.model}</div>`;
+        }
+        
+        if (vehicleData.colour) {
+          detailsHTML += `<div class="vehicle-detail"><span class="detail-label">Colour:</span> ${vehicleData.colour}</div>`;
+        }
+        
+        vehicleDetails.innerHTML = detailsHTML;
+        
+        // Show results
+        results.style.display = 'block';
+      }
+    });
+  </script>
+</body>
+</html>
